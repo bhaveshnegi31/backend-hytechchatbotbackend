@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.botframework.com/botframework-webchat/latest/webchat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@latest/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle-min.js"></script>
+
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+      }
+
+      #open-chatbot-icon {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 1000;
+        cursor: pointer;
+      }
+
+      #webchat-container {
+        display: none;
+        height: 80%;
+        width: 30%;
+        position: fixed;
+        bottom: 50px;
+        right: 30px;
+        transition: all 0.3s ease-in-out;
+        z-index: 9999;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        background-color: #ffffff;
+        border-radius: 20px;
+        overflow: hidden;
+      }
+
+      #webchat-container.maximized {
+        height: 100%;
+        width: 100%;
+        bottom: 0;
+        right: 0;
+        border-radius: 0%;
+      }
+
+      #resize-icon {
+        position: absolute;
+        top: 10px;
+        right: 40px;
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+        /* z-index: 1000; */
+      }
+
+      #close-icon {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+        /* z-index: 1000; */
+      }
+
+      #webchat {
+        width: 100%;
+        height: 90%;
+        overflow: auto;
+      }
+
+      #topnav {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 35px;
+        background-color: lightcyan;
+      }
+
+      #mic-button {
+        position: absolute;
+        bottom: 35px;
+        left: 0px;
+        width: 34px;
+        height: 34px;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        /* z-index: 1000; */
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      }
+      #webchat-container.maximized #mic-button {
+        width: 42px;
+        height: 42px;
+        bottom: 42px;
+      }
+
+      #mic-button:hover {
+        background-color: rgb(210, 210, 210);
+      }
+
+      #mic-button img {
+        width: 30px;
+        height: 30px;
+      }
+
+      #Powered-by {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background-color: lightcyan;
+        position: absolute;
+        bottom: 0px;
+        height: 35px;
+        width: 100%;
+        text-align: center;
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+        color: blue;
+        font-weight: bold;
+      }
+      #webchat-container.maximized #Powered-by {
+        height: 40px;
+      }
+
+      /* Styling for user and bot messages */
+      .webchat__bubble {
+        max-width: 80%;
+        padding: 10px;
+        border-radius: 15px;
+        margin-bottom: 10px;
+      }
+
+      .webchat__bubble--from-user {
+        background-color: rgba(0, 255, 0, 0.1);
+      }
+
+      .webchat__bubble--from-bot {
+        background-color: rgba(0, 0, 255, 0.1);
+      }
+
+      /* Only bold headings */
+      .webchat__bubble p:first-child {
+        font-weight: none;
+        margin-bottom: 5px;
+      }
+
+      .webchat__bubble p:not(:first-child) {
+        font-weight: normal;
+      }
+
+      #dots-container {
+        display: flex;
+        /* Default to show dots */
+        position: absolute;
+        bottom: 85px;
+        /* Adjust based on where you want it to appear */
+        left: 7%;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+      }
+
+      .dot {
+        width: 5px;
+        height: 5px;
+        margin: 0 2px;
+        background-color: #7f7f80;
+        border-radius: 50%;
+        animation: bounce 1.5s infinite ease-in-out;
+      }
+
+      .dot:nth-child(2) {
+        animation-delay: 0.1s;
+      }
+
+      .dot:nth-child(3) {
+        animation-delay: 0.2s;
+      }
+
+      @keyframes bounce {
+        0%,
+        20%,
+        50%,
+        80%,
+        100% {
+          transform: translateY(0);
+        }
+
+        40% {
+          transform: translateY(-10px);
+        }
+
+        60% {
+          transform: translateY(-5px);
+        }
+      }
+
+      /* Style for the microphone button */
+      .webchat__send-box .webchat__microphone-button {
+        order: 1; /* Ensures the microphone button is first */
+        margin-right: auto; /* Pushes the send button to the right */
+        display: inline;
+      }
+
+      /* Style for the send button */
+    </style>
+  </head>
+
+  <body>
+    <!-- Chatbot Icon to Open the Chatbot -->
+    <img
+      id="open-chatbot-icon"
+      src="https://img.icons8.com/material-rounded/48/000000/chatbot.png"
+      alt="Chatbot Icon"
+    />
+
+    <!-- Chatbot Container -->
+    <div id="webchat-container">
+      <div id="topnav">
+        <h2>ChatBot</h2>
+        <img
+          id="resize-icon"
+          src="https://img.icons8.com/material-outlined/24/000000/full-screen.png"
+          alt="Resize Icon"
+        />
+        <img
+          id="close-icon"
+          src="https://img.icons8.com/material-outlined/24/000000/close-window.png"
+          alt="Close Icon"
+        />
+      </div>
+      <div id="webchat" role="main"></div>
+      <!-- Mic button fixed at the bottom of the container -->
+      <!-- <button id="mic-button">
+            <img src="https://img.icons8.com/material-outlined/24/000000/microphone.png" alt="Mic Icon" />
+        </button> -->
+      <!-- <div id="dots-container">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+        </div> -->
+      <div id="Powered-by">
+        Powered by&nbsp;<img
+          src="https://imagetolink.com/ib/dDdpOx9lb0.jfif"
+          alt=""
+          style="height: 12vh; width: 120px; mix-blend-mode: darken"
+        />
+      </div>
+    </div>
+
+    <script>
+      // Set the CSS rules for WebChat.
+      let flag = false;
+      const styleSet = window.WebChat.createStyleSet({
+        bubbleBackground: "rgba(0, 0, 255, .1)",
+        bubbleFromUserBackground: "rgba(0, 255, 0, .1)",
+        rootHeight: "95%",
+        rootWidth: "100%",
+        bubbleNubSize: 0, // Hide the nub to avoid cutting issues
+        // bubblePadding: "12px 12px 12px 20px", // Adjust padding: top, right, bottom, left
+        bubbleFromUserPadding: "12px",
+        bubbleBorderRadius: "10px",
+        bubbleMinWidth: "30%", // Set a minimum width for bubbles
+        bubbleMaxWidth: "70%", // Adjust maximum width to prevent cutting off text
+        bubbleMarginLeft: "30px", // Set margin-left for bot responses
+        microphoneButtonColorOnDictate: "yellow",
+        sendBoxButtonColor: "#0078D4", // Default color
+        sendBoxButtonColorOnDisabled: "#A6A6A6", // Disabled color
+        sendBoxButtonColorOnFocus: "#005A9E", // Focus color
+        sendBoxButtonColorOnHover: "#005A9E", // Hover color
+        sendBoxHeight: "40px", // Height of the send button
+        subtle: "#D1D1D1", // Default color if sendBoxButtonColor is not provided
+      });
+      const avatarOptions = {
+        botAvatarImage: "https://imagetolink.com/ib/kl6kdkTItY.png",
+        botAvatarInitials: "BF",
+        userAvatarImage: "https://imagetolink.com/ib/JVF1gJXUFo.jpg",
+        userAvatarInitials: "WC",
+        hideUploadButton: "true",
+        sendBoxTextWrap: "true",
+      };
+    
+      styleSet.textContent.p = {
+        ...styleSet.textContent.p,
+        paddingLeft: "0px",
+      };
+      styleSet.textContent.li = {
+        ...styleSet.textContent.li,
+        paddingLeft: "20px",
+        marginLeft: "20px",
+      };
+
+      const directLine = window.WebChat.createDirectLine({
+        secret: "8Ao8LLGibv0.nLjUXtQA7ft6IhzalT9KtTBBW9mqqXrqq_0WVPKgCS8",
+      });
+      const speechPonyfillFactory = flag
+        ? null
+        : window.WebChat.createCognitiveServicesSpeechServicesPonyfillFactory({
+            credentials: {
+              region: "eastus",
+              subscriptionKey: "00991066d88e4788833d9f7ca7dd2e09",
+            },
+            
+          });
+      console.log(speechPonyfillFactory);
+
+      window.WebChat.renderWebChat(
+        {
+          directLine: directLine,
+          styleSet: styleSet,
+          styleOptions: avatarOptions,
+          webSpeechPonyfillFactory: speechPonyfillFactory,
+          store: window.WebChat.createStore(
+            {},
+            ({ dispatch }) =>
+              (next) =>
+              (action) => {
+                if (action.type === "WEB_CHAT/SET_SEND_BOX") {
+                  const text = action.payload.text;
+                  const microphoneButton = document.querySelector(
+                    ".webchat__microphone-button"
+                  );
+                  const sendButton = document.querySelector(
+                    ".webchat__send-button"
+                  );
+                  flag = text && text.trim() !== "";
+                  if (text && text.trim() !== "") {
+                    // User is typing, show send button and hide speech button
+                    if (microphoneButton)
+                      microphoneButton.style.display = "none";
+                  } else {
+                    // No input, show speech button and hide send button
+                    if (microphoneButton) {
+                      microphoneButton.style.display = "inline-flex";
+                      microphoneButton.style.pointerEvents = "auto"; // Enable speech button
+                    }
+                    if (sendButton) sendButton.style.display = "none";
+                  }
+                }
+
+                return next(action);
+              }
+          ),
+        },
+        document.getElementById("webchat")
+      );
+
+      const webchatContainer = document.getElementById("webchat-container");
+      const resizeButton = document.getElementById("resize-icon");
+      const closeButton = document.getElementById("close-icon");
+      const openChatbotIcon = document.getElementById("open-chatbot-icon");
+
+      // Handle open chatbot icon click
+      openChatbotIcon.addEventListener("click", () => {
+        webchatContainer.style.display = "block";
+        openChatbotIcon.style.display = "none";
+      });
+
+      // Handle resize button click
+      resizeButton.addEventListener("click", () => {
+        webchatContainer.classList.toggle("maximized");
+        resizeButton.textContent = webchatContainer.classList.contains(
+          "maximized"
+        )
+          ? "Shrink"
+          : "Resize";
+      });
+
+      // Handle close button click
+      closeButton.addEventListener("click", () => {
+        webchatContainer.style.display = "none";
+        openChatbotIcon.style.display = "block";
+      });
+
+     
+    </script>
+  </body>
+</html>
